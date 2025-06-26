@@ -32,11 +32,13 @@ class QuestionGenerator:
         print("Loading language models...")
         self.generator = pipeline(
             "text-generation", 
-            model="Qwen/Qwen2.5-7B",
+            model="distilgpt2",
             device_map="auto",
-            torch_dtype=torch.float16,
-            load_in_4bit=True
+            torch_dtype=torch.float16
+            pad_token_id=50256,
+            eos_token_id=50256
         )
+        
         self.obfuscator = pipeline(
             "text2text-generation", 
             model="google/flan-t5-base",
@@ -188,9 +190,11 @@ def generate_dataset(output_path="webpuzzle_dataset.jsonl", num_samples=100):
             doc1 = random.choice(base_data)
             doc2 = random.choice(base_data)
             
+            # print(doc1.keys(), doc2.keys()) # DEBUG
+
             # 获取文本内容
-            text1 = doc1['text'] if isinstance(doc1, dict) else doc1
-            text2 = doc2['text'] if isinstance(doc2, dict) else doc2
+            text1 = doc1[list(doc1.keys())[0]]
+            text2 = doc2[list(doc2.keys())[0]]
             
             # 添加噪声
             text1 = add_web_noise(text1)
@@ -227,4 +231,4 @@ def generate_dataset(output_path="webpuzzle_dataset.jsonl", num_samples=100):
 # 运行生成
 if __name__ == "__main__":
     # 生成100条样本（实际使用可增加）
-    generate_dataset(num_samples=100)
+    generate_dataset(num_samples=1000)
