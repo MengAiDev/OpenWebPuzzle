@@ -1,14 +1,41 @@
 import json
 import random
 import re
+import time
+import requests
 from datasets import load_dataset
-from transformers import pipeline
-from tqdm.auto import tqdm  # 兼容Jupyter和脚本
-import torch
+from tqdm.auto import tqdm
 
 # 设置随机种子保证可复现
 random.seed(42)
-torch.manual_seed(42)
+
+# 智谱AI API配置 - 替换为你的实际API密钥
+API_KEY = "your_api_key_here"  # 从智谱AI平台获取
+API_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+MODEL_NAME = "glm-4"  # 使用GLM-4模型
+
+def call_chatglm_api(prompt, max_tokens=512, temperature=0.7):
+    """调用智谱AI的API生成文本"""
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": MODEL_NAME,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+        "temperature": temperature
+    }
+    
+    try:
+        response = requests.post(API_URL, json=payload, headers=headers, timeout=30)
+        response.raise_for_status()
+        result = response.json()
+        return result['choices'][0]['message']['content']
+    except Exception as e:
+        print(f"API调用失败: {str(e)}")
+        return ""
 
 # 1. 基础数据源 - 使用公开本地化数据集
 def load_base_data():
@@ -26,56 +53,41 @@ def load_base_data():
     
     return c4_data + arxiv_data
 
-# 2. 问题生成 - 完全本地化
+# 2. 问题生成 - 使用云端API
 class QuestionGenerator:
-    def __init__(self):
-        print("Loading language models...")
-        self.generator = pipeline(
-            "text-generation", 
-            model="distilgpt2",
-            device_map="auto",
-            torch_dtype=torch.float16
-            pad_token_id=50256,
-            eos_token_id=50256
-        )
-        
-        self.obfuscator = pipeline(
-            "text2text-generation", 
-            model="google/flan-t5-base",
-            device_map="auto"
-        )
-    
     def generate_cross_page_qa(self, doc1, doc2):
-        """Generate cross-document reasoning question"""
+        """Generate cross-document reasoning question using API"""
         prompt = f"""
-        Generate a question requiring comprehensive reasoning based on two texts:
-        Text 1: {doc1[:500]}...
-        Text 2: {doc2[:500]}...
+        请基于以下两个文本生成一个需要综合推理的问题：
         
-        Requirements:
-        1. The question must require information from both texts
-        2. The answer should not be explicitly stated in either text
-        3. Output format: {{"question": "question_content", "answer": "answer"}}
+        文本1: {doc1[:500]}...
+        文本2: {doc2[:500]}...
+        
+        要求：
+        1. 问题必须同时需要两个文本的信息
+        2. 答案不能直接在任一文本中明确写出
+        3. 输出格式必须是严格的JSON格式：{{"question": "问题内容", "answer": "答案"}}
         """
-        result = self.generator(prompt, max_new_tokens=150)[0]['generated_text']
+        
+        result = call_chatglm_api(prompt)
         return self._parse_json_output(result)
     
     def generate_riddle(self, text):
         """Generate riddle-style question"""
-        # Extract entities using regex
+        # 使用正则表达式提取实体
         entities = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', text)
         if not entities: 
             return None
         
         target_entity = random.choice(entities)
         
-        # Obfuscate entity
-        obfuscation_prompt = f"Replace the entity with a vague description: '{target_entity}'"
-        obfuscated = self.obfuscator(obfuscation_prompt, max_length=50)[0]['generated_text']
+        # 使用API混淆实体
+        prompt = f"请将以下实体替换为模糊的描述：'{target_entity}'。只需输出替换后的描述文本，不要包含其他内容。"
+        obfuscated = call_chatglm_api(prompt, max_tokens=50)
         
-        # Build riddle
+        # 构建谜题
         context = text.replace(target_entity, "[REDACTED]", 1)
-        question = f"What does '{obfuscated}' refer to in the context?"
+        question = f"上下文中的'{obfuscated}'指的是什么？"
         
         return {
             "question": question,
@@ -84,33 +96,24 @@ class QuestionGenerator:
         }
     
     def _parse_json_output(self, text):
-        """Parse JSON from LLM output"""
+        """Parse JSON from API output"""
         try:
-            # Find first JSON-like structure
+            # 尝试提取JSON部分
             start = text.find('{')
             end = text.rfind('}')
             if start == -1 or end == -1:
-                return {"question": "Invalid format", "answer": ""}
+                return {"question": "无效格式", "answer": ""}
                 
             json_str = text[start:end+1]
             return json.loads(json_str)
         except json.JSONDecodeError:
-            return {"question": "JSON parse error", "answer": ""}
+            return {"question": "JSON解析错误", "answer": ""}
 
-# 3. 难度标注系统
+# 3. 难度标注系统 - 使用规则方法
 class DifficultyTagger:
-    def __init__(self):
-        # 使用轻量级模型
-        self.evaluator = pipeline(
-            "text-classification", 
-            model="distilbert-base-uncased",
-            device_map="auto"
-        )
-    
     def tag_difficulty(self, question, answer):
         """
-        Simulate pass@k difficulty tagging
-        Simplified implementation for local use
+        基于规则标注难度
         """
         complexity = self._estimate_complexity(question)
         ambiguity = self._estimate_ambiguity(question, answer)
@@ -121,7 +124,7 @@ class DifficultyTagger:
         return "easy"
     
     def _estimate_complexity(self, text):
-        """Estimate complexity based on text features"""
+        """基于文本特征估计复杂度"""
         words = text.split()
         if not words:
             return 0.0
@@ -131,39 +134,37 @@ class DifficultyTagger:
         return min(0.9, (word_count/100 + unique_ratio))
     
     def _estimate_ambiguity(self, question, answer):
-        """Estimate question ambiguity"""
-        try:
-            q_result = self.evaluator(question, truncation=True)[0]
-            a_result = self.evaluator(answer, truncation=True)[0]
-            return abs(q_result['score'] - a_result['score'])
-        except:
-            return random.uniform(0.3, 0.7)
+        """估计问题的模糊性（简化实现）"""
+        # 基于问题长度和答案长度的差异
+        q_len = len(question)
+        a_len = len(answer)
+        return min(0.9, abs(q_len - a_len) / max(q_len, a_len))
 
 # 4. 添加噪声模拟真实网页
 def add_web_noise(text, noise_level=0.2):
     """Add noise to simulate real web content"""
-    # Skip if text is too short
+    # 文本过短时跳过
     if len(text) < 50:
         return text
         
     words = text.split()
     
-    # Random deletion
+    # 随机删除
     if random.random() < noise_level and len(words) > 10:
         del_idx = random.randint(0, len(words)-1)
         words.pop(del_idx)
     
-    # Random replacement
+    # 随机替换
     if random.random() < noise_level and len(words) > 5:
         rep_idx = random.randint(0, len(words)-1)
-        words[rep_idx] = random.choice(["related", "important", "reportedly", "according to sources"])
+        words[rep_idx] = random.choice(["相关", "重要", "据报道", "根据消息来源"])
     
-    # Add unrelated content
+    # 添加不相关内容
     if random.random() < noise_level/3:
         ads = [
-            "Sponsored content: Click for details",
-            "Advertisement: Special offer today",
-            "Recommended for you: Similar products"
+            "赞助内容：点击查看详情",
+            "广告：今日特惠",
+            "为您推荐：类似产品"
         ]
         words.insert(random.randint(0, len(words)//2), random.choice(ads))
     
@@ -173,16 +174,16 @@ def add_web_noise(text, noise_level=0.2):
 def generate_dataset(output_path="webpuzzle_dataset.jsonl", num_samples=100):
     base_data = load_base_data()
     if not base_data:
-        print("Error: No base data loaded")
+        print("错误：未加载基础数据")
         return
         
     generator = QuestionGenerator()
     tagger = DifficultyTagger()
     
-    print(f"Generating {num_samples} samples...")
+    print(f"生成 {num_samples} 个样本...")
     with open(output_path, "w", encoding="utf-8") as f:
-        # 添加tqdm进度条
-        progress_bar = tqdm(total=num_samples, desc="Generating samples")
+        # 添加进度条
+        progress_bar = tqdm(total=num_samples, desc="生成样本")
         
         sample_count = 0
         while sample_count < num_samples:
@@ -190,8 +191,6 @@ def generate_dataset(output_path="webpuzzle_dataset.jsonl", num_samples=100):
             doc1 = random.choice(base_data)
             doc2 = random.choice(base_data)
             
-            # print(doc1.keys(), doc2.keys()) # DEBUG
-
             # 获取文本内容
             text1 = doc1[list(doc1.keys())[0]]
             text2 = doc2[list(doc2.keys())[0]]
@@ -223,12 +222,15 @@ def generate_dataset(output_path="webpuzzle_dataset.jsonl", num_samples=100):
             
             sample_count += 1
             progress_bar.update(1)
+            
+            # 添加延迟以避免API速率限制
+            time.sleep(1.5)
         
         progress_bar.close()
     
-    print(f"Dataset generated at: {output_path}")
+    print(f"数据集已生成: {output_path}")
 
 # 运行生成
 if __name__ == "__main__":
-    # 生成100条样本（实际使用可增加）
-    generate_dataset(num_samples=1000)
+    # 生成样本（建议从较小数量开始）
+    generate_dataset(num_samples=50)  # 开始时使用较小的数量
