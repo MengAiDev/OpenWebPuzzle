@@ -9,13 +9,13 @@ from tqdm.auto import tqdm
 # 设置随机种子保证可复现
 random.seed(42)
 
-# 智谱AI API配置 - 替换为你的实际API密钥
-API_KEY = "your_api_key_here"  # 从智谱AI平台获取
-API_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
-MODEL_NAME = "glm-4"  # 使用GLM-4模型
+# OpenAI格式API配置
+API_KEY = "your_api_key_here"  # 从iFlow控制台获取
+BASE_URL = "https://apis.iflow.cn/v1"  # OpenAI格式的基础URL
+MODEL_NAME = "qwen3-32b"  # 使用iFlow平台上的模型名称
 
-def call_chatglm_api(prompt, max_tokens=512, temperature=0.7):
-    """调用智谱AI的API生成文本"""
+def call_openai_api(prompt, max_tokens=512, temperature=0.7):
+    """调用OpenAI格式的API生成文本"""
     headers = {
         "Authorization": f"Bearer {API_KEY}",
         "Content-Type": "application/json"
@@ -29,7 +29,7 @@ def call_chatglm_api(prompt, max_tokens=512, temperature=0.7):
     }
     
     try:
-        response = requests.post(API_URL, json=payload, headers=headers, timeout=30)
+        response = requests.post(f"{BASE_URL}/chat/completions", json=payload, headers=headers, timeout=30)
         response.raise_for_status()
         result = response.json()
         return result['choices'][0]['message']['content']
@@ -69,7 +69,7 @@ class QuestionGenerator:
         3. 输出格式必须是严格的JSON格式：{{"question": "问题内容", "answer": "答案"}}
         """
         
-        result = call_chatglm_api(prompt)
+        result = call_openai_api(prompt)
         return self._parse_json_output(result)
     
     def generate_riddle(self, text):
@@ -83,7 +83,7 @@ class QuestionGenerator:
         
         # 使用API混淆实体
         prompt = f"请将以下实体替换为模糊的描述：'{target_entity}'。只需输出替换后的描述文本，不要包含其他内容。"
-        obfuscated = call_chatglm_api(prompt, max_tokens=50)
+        obfuscated = call_openai_api(prompt, max_tokens=50)
         
         # 构建谜题
         context = text.replace(target_entity, "[REDACTED]", 1)
@@ -232,5 +232,4 @@ def generate_dataset(output_path="webpuzzle_dataset.jsonl", num_samples=100):
 
 # 运行生成
 if __name__ == "__main__":
-    # 生成样本（建议从较小数量开始）
-    generate_dataset(num_samples=50)  # 开始时使用较小的数量
+    generate_dataset(num_samples=50) 
