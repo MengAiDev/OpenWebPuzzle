@@ -11,7 +11,7 @@ OpenWebPuzzle 是一个模拟真实网页环境的问答数据集，包含 500 �
 | 样本数量 | 500 |
 | 问题类型 | 跨页推理、谜语式问题 |
 | 难度分布 | 简单(easy)、中等(medium)、困难(hard) |
-| 生成模型 | 通义千问(qwen-turbo) |
+| 生成模型 | Qwen3-Coder-480B-A35B (Iflow API) |
 | 数据来源 | C4数据集、中文维基百科 |
 | 文件格式 | JSON Lines (.jsonl) |
 | 文件大小 | 1123 KB |
@@ -22,46 +22,20 @@ OpenWebPuzzle 是一个模拟真实网页环境的问答数据集，包含 500 �
 
 ```json
 {
-  "id": "sample_1",
+  "question": "如何利用天体物理环境中产生的不稳定核素的理论预测模型，结合珍珠光泽材料的特性，设计出既符合核反应稳定性要求又具备优雅珠宝美学的新型材料？",      "answer": "通过理论模型预测核反应产生的稳定核素的物理特性（如耐久性与光学性质），将其与珍珠光泽的柔和质感及金属材料的工艺结合，可开发出兼具科学稳定性与美学价值的珠宝。需平衡核素的实验验证需求与珠宝设计的简约风格，确保材料在极端环境下的稳定性同时满足优雅外观的需求。",
   "type": "cross_page",
-  "question": "基于两个文本，哪个城市既举办了2022年冬奥会又是古代丝绸之路的起点？",
-  "answer": "北京",
-  "difficulty": "hard",
-  "context": "文本1: 2022年冬奥会在北京成功举办... [隐藏] ...丝绸之路从长安出发...",
-  "source_doc": "北京是中国的首都，拥有超过2100万人口..."
+  "id": "webpuzzle_1",
+  "difficulty": "medium"
 }
 ```
 
 ### 字段说明
 
-- **id**: 样本唯一标识符 (格式: sample_{序号})
-- **type**: 问题类型
-  - `cross_page`: 跨页推理问题，需要综合两个文本信息
-  - `riddle`: 谜语式问题，需要识别隐藏实体
-- **question**: 需要回答的问题
-- **answer**: 问题的正确答案
-- **difficulty**: 难度等级 (easy/medium/hard)
-- **context**: 问题上下文（仅谜语式问题包含）
-- **source_doc**: 源文本片段（截取前100字符）
-
-## 数据分布
-
-### 问题类型分布
-```mermaid
-pie
-    title 问题类型分布
-    "跨页推理(cross_page)" : 52
-    "谜语式问题(riddle)" : 48
-```
-
-### 难度分布
-```mermaid
-pie
-    title 难度分布
-    "简单(easy)" : 35
-    "中等(medium)" : 40
-    "困难(hard)" : 25
-```
+- **question**: 问题
+- **answer**: 答案
+- **type**: 类型，包括 cross_page 和 riddle
+- **id**: 唯一个ID
+- **difficulty**: 难度，由规则引擎标注
 
 ## 使用示例
 
@@ -115,6 +89,8 @@ print(f"第一个样本: {dataset[0]['question']}")
 
 如有任何问题或建议，请联系：
 - GitHub：https://github.com/MengAiDev/OpenWebPuzzle
+- ModelScope: https://modelscope.cn/datasets/MengAiDev/OpenWebPuzzle
+- Kaggle Notebook: https://www.kaggle.com/code/mengaidev/open-web-puzzle
 
 ## 已知限制
 
