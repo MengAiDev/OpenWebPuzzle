@@ -6,15 +6,7 @@ OpenWebPuzzle is a question-answering dataset that simulates real web environmen
 
 ## Dataset Details
 
-| Attribute | Value |
-|------|----|
-| Number of Samples | 500 |
-| Question Types | Cross-page Reasoning, Riddle-style Questions |
-| Difficulty Distribution | Easy, Medium, Hard |
-| Generation Model | Qwen3-Coder-480B-A35B (Iflow API) |
-| Data Sources | C4 Dataset, Chinese Wikipedia |
-| File Format | JSON Lines (.jsonl) |
-| File Size | 1123 KB |
+Please see at: https://modelscope.cn/datasets/MengAiDev/OpenWebPuzzle
 
 ## Data Structure
 
@@ -29,6 +21,18 @@ Each sample is a JSON object containing the following fields:
 }
 ```
 
+And
+
+```json
+{
+  "question": "上下文中的'一位知名音乐制作人'指的是什么？",
+  "answer": "Karat Faye",
+  "context": "Thanks to the band, Arnie, Brian, and Dane for making this music possible, better late than never! Special thanks to Robert Margouleff and [REDACTED] for their musical expertise in the L.A. Studios. For providing a perfectly beautiful working atmosphere so that I could bring these recordings back to life.",
+  "type": "riddle",
+  "id": "webpuzzle_10",
+  "difficulty": "medium"
+}
+```
 ### Field Descriptions
 
 - **question**: The question
@@ -36,6 +40,10 @@ Each sample is a JSON object containing the following fields:
 - **type**: Type, including cross_page and riddle
 - **id**: Unique ID
 - **difficulty**: Difficulty, labeled by a rule-based engine
+
+And
+
+- **content**: The source
 
 ## Usage Example
 
