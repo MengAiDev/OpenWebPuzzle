@@ -2,7 +2,7 @@
 
 ## Overview
 
-OpenWebPuzzle is a question-answering dataset that simulates real web environments, containing 500 question-answer pairs requiring comprehensive reasoning skills. These questions mimic scenarios where users need to connect different pieces of information across multiple web pages to solve complex problems.
+OpenWebPuzzle is a question-answering dataset that simulates real web environments, containing 7k question-answer pairs requiring comprehensive reasoning skills. These questions mimic scenarios where users need to connect different pieces of information across multiple web pages to solve complex problems.
 
 ## Dataset Details
 
